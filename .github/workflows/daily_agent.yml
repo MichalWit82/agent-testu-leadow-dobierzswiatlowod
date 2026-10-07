@@ -2,9 +2,8 @@ name: Codzienny Agent Testowy
 
 on:
   schedule:
-    # Uruchamiaj codziennie o 07:00 UTC (8:00 lub 9:00 czasu polskiego)
     - cron: '0 7 * * *'
-  workflow_dispatch: # Przycisk do ręcznego uruchamiania w dowolnym momencie
+  workflow_dispatch:
 
 jobs:
   run-agent:
@@ -26,9 +25,44 @@ jobs:
       - name: Uruchom agenta
         run: python agent.py
 
-      - name: Zapisz zrzut ekranu w razie błędu
-        if: failure()
-        uses: actions/upload-artifact@v4
+      - name: Wyślij e-mail o sukcesie
+        if: success()
+        uses: dawidd6/action-send-mail@v3
         with:
-          name: error-screenshot
-          path: error.png
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "✅ [RAPORT] Landing Page dobierzswiatlowod.netradar.pl działa prawidłowo!"
+          to: michal@e-pasaz.eu
+          from: Agent Testowy <${{ secrets.MAIL_USERNAME }}>
+          body: |
+            Cześć Michał,
+
+            Twój automatyczny agent właśnie przeszedł cały proces na stronie dobierzswiatlowod.netradar.pl.
+            Formularz został pomyślnie wypełniony i przesłany.
+
+            Status: SUKCES (100% sprawności)
+
+            Pozdrawiamy,
+            Twój Agent AI na GitHubie
+
+      - name: Wyślij e-mail o błędzie
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "🚨 [ALARM] Błąd na stronie dobierzswiatlowod.netradar.pl!"
+          to: michal@e-pasaz.eu
+          from: Agent Testowy <${{ secrets.MAIL_USERNAME }}>
+          body: |
+            Cześć Michał,
+
+            Uwaga! Agent wykrył problem podczas próby wypełnienia formularza na stronie dobierzswiatlowod.netradar.pl.
+            W załączniku do tej wiadomości znajdziesz zrzut ekranu z momentu wystąpienia błędu.
+          attachments: error.png
