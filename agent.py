@@ -6,10 +6,10 @@ from playwright.sync_api import sync_playwright
 URL_FORMULARZA = "https://e-pasazeu.involve.me/internet-swiatlowodowy"
 
 MIASTO = "Warszawa"
-ULICA = "Marszałkowska"
-NUMER_DOMU = "1"
+ULICA = "Gandhi"
+NUMER_DOMU = "27"
 EMAIL = "test.agent.leads@example.com"
-TELEFON = "500600700"
+TELEFON = "509090444"
 
 def run_agent():
     print(f"🚀 [START] Uruchamiam agenta bezpośrednio dla formularza: {URL_FORMULARZA}")
