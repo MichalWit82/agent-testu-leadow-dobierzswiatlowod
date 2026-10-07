@@ -1,90 +1,74 @@
-import sys
-import time
-from playwright.sync_api import sync_playwright
+name: Codzienny Agent Testowy
 
-# Wchodzimy bezpośrednio do formularza involve.me osadzonego na Twojej stronie
-URL_FORMULARZA = "https://e-pasazeu.involve.me/internet-swiatlowodowy"
+on:
+  schedule:
+    # Uruchamiaj codziennie o 07:00 UTC (8:00/9:00 czasu polskiego)
+    - cron: '0 7 * * *'
+  workflow_dispatch:
 
-MIASTO = "Warszawa"
-ULICA = "Gandhi"
-NUMER_DOMU = "27"
-EMAIL = "test.agent.leads@example.com"
-TELEFON = "509090444"
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pobierz kod
+        uses: actions/checkout@v4
 
-def run_agent():
-    print(f"🚀 [START] Uruchamiam agenta bezpośrednio dla formularza: {URL_FORMULARZA}")
-    
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            viewport={"width": 1280, "height": 800},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        )
-        page = context.new_page()
+      - name: Skonfiguruj Pythona
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-        try:
-            # 1. Ładowanie bezpośredniego formularza
-            page.goto(URL_FORMULARZA, timeout=40000, wait_until="networkidle")
-            print("✅ Formularz załadowany pomyślnie.")
-            page.wait_for_timeout(2000)
+      - name: Zainstaluj biblioteki i przeglądarkę
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
 
-            # 2. Wypełnianie pól w Involve.me
-            print("⏳ Wypełniam formularz...")
+      - name: Uruchom agenta
+        run: python agent.py
 
-            # Wpisanie adresu/miasta w pierwsze pole tekstowe
-            first_input = page.locator('input[type="text"], textarea').first
-            if first_input.is_visible(timeout=5000):
-                first_input.fill(f"{MIASTO}, {ULICA} {NUMER_DOMU}")
-                print("✅ Wpisano adres.")
-            
-            # Przejście do kolejnego kroku (Involve.me ma zazwyczaj przycisk z klasą lub tekstem "Dalej" / "Next")
-            next_btn = page.locator('button, div[role="button"]').filter(has_text="Dalej").first
-            if next_btn.is_visible(timeout=3000):
-                next_btn.click()
-            else:
-                # Wciśnięcie Enter na wypadki braku widocznego przycisku
-                page.keyboard.press("Enter")
-            
-            page.wait_for_timeout(2000)
+      # --- E-MAIL W PRZYPADKU SUKCESU ---
+      - name: Wyślij e-mail o sukcesie
+        if: success()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "✅ [RAPORT] Landing Page dobierzswiatlowod.netradar.pl działa prawidłowo!"
+          to: michal@e-pasaz.eu
+          from: Agent Testowy <${{ secrets.MAIL_USERNAME }}>
+          body: |
+            Cześć Michał,
 
-            # 3. Uzupełnienie e-maila i telefonu
-            email_input = page.locator('input[type="email"]').first
-            if email_input.is_visible(timeout=3000):
-                email_input.fill(EMAIL)
-                print("✅ Email uzupełniony.")
+            Twój automatyczny agent właśnie przeszedł cały proces na stronie dobierzswiatlowod.netradar.pl.
+            Formularz został pomyślnie wypełniony i przesłany.
 
-            phone_input = page.locator('input[type="tel"]').first
-            if phone_input.is_visible(timeout=2000):
-                phone_field.fill(TELEFON)
-                print("✅ Telefon uzupełniony.")
+            Data testu: ${{ github.event.repository.updated_at }}
+            Status: SUKCES (100% sprawności)
 
-            # Zaznaczenie checkboxów
-            checkboxes = page.locator('input[type="checkbox"]')
-            for i in range(checkboxes.count()):
-                cb = checkboxes.nth(i)
-                if cb.is_visible() and not cb.is_checked():
-                    cb.check(force=True)
+            Pozdrawiamy,
+            Twój Agent AI na GitHubie
 
-            # 4. Finalne wysłanie
-            submit_btn = page.locator('button[type="submit"], button:has-text("Wyślij"), button:has-text("Zobacz"), button:has-text("Sprawdź")').first
-            if submit_btn.is_visible(timeout=3000):
-                submit_btn.click(force=True)
-                print("✅ Kliknięto przycisk wysyłania.")
-            else:
-                page.keyboard.press("Enter")
+      # --- E-MAIL W PRZYPADKU AWARII/BŁĘDU ---
+      - name: Wyślij e-mail o błędzie
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "🚨 [ALARM] Błąd na stronie dobierzswiatlowod.netradar.pl!"
+          to: michal@e-pasaz.eu
+          from: Agent Testowy <${{ secrets.MAIL_USERNAME }}>
+          body: |
+            Cześć Michał,
 
-            page.wait_for_timeout(4000)
+            Uwaga! Agent wykrył problem podczas próby wypełnienia formularza na stronie dobierzswiatlowod.netradar.pl.
+            W załączniku do tej wiadomości znajdziesz zrzut ekranu z momentu wystąpienia błędu.
 
-            # 5. Weryfikacja
-            print("🎉 [SUKCES] Process wypełniania formularza ukończony!")
-
-        except Exception as e:
-            print(f"\n❌ [BŁĄD AGENTA]: {e}")
-            page.screenshot(path="error.png", full_page=True)
-            print("📸 Zapisano zrzut ekranu do error.png")
-            sys.exit(1)
-        finally:
-            browser.close()
-
-if __name__ == "__main__":
-    run_agent()
+            Sprawdź czy serwis działa poprawnie!
+          attachments: error.png
