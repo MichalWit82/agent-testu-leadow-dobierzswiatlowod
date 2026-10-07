@@ -1,0 +1,34 @@
+name: Codzienny Agent Testowy
+
+on:
+  schedule:
+    # Uruchamiaj codziennie o 07:00 UTC (8:00 lub 9:00 czasu polskiego)
+    - cron: '0 7 * * *'
+  workflow_dispatch: # Przycisk do ręcznego uruchamiania w dowolnym momencie
+
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pobierz kod
+        uses: actions/checkout@v4
+
+      - name: Skonfiguruj Pythona
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Zainstaluj biblioteki i przeglądarkę
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Uruchom agenta
+        run: python agent.py
+
+      - name: Zapisz zrzut ekranu w razie błędu
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: error-screenshot
+          path: error.png
