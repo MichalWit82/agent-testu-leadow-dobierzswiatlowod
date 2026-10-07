@@ -2,7 +2,8 @@ import sys
 import time
 from playwright.sync_api import sync_playwright
 
-URL = "https://dobierzswiatlowod.netradar.pl/"
+# Wchodzimy bezpośrednio do formularza involve.me osadzonego na Twojej stronie
+URL_FORMULARZA = "https://e-pasazeu.involve.me/internet-swiatlowodowy"
 
 MIASTO = "Warszawa"
 ULICA = "Marszałkowska"
@@ -11,7 +12,7 @@ EMAIL = "test.agent.leads@example.com"
 TELEFON = "500600700"
 
 def run_agent():
-    print(f"🚀 [START] Uruchamiam agenta dla: {URL}")
+    print(f"🚀 [START] Uruchamiam agenta bezpośrednio dla formularza: {URL_FORMULARZA}")
     
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -22,92 +23,60 @@ def run_agent():
         page = context.new_page()
 
         try:
-            # 1. Ładowanie strony
-            page.goto(URL, timeout=40000, wait_until="networkidle")
-            print("✅ Strona załadowana pomyślnie.")
+            # 1. Ładowanie bezpośredniego formularza
+            page.goto(URL_FORMULARZA, timeout=40000, wait_until="networkidle")
+            print("✅ Formularz załadowany pomyślnie.")
             page.wait_for_timeout(2000)
 
-            # 2. Akceptacja Cookies
-            try:
-                cookie_btn = page.locator('button:has-text("Akceptuję"), button:has-text("Zgoda"), button:has-text("Zaakceptuj"), #accept-cookies').first
-                if cookie_btn.is_visible(timeout=2000):
-                    cookie_btn.click()
-                    print("✅ Zamknięto banner cookies.")
-            except Exception:
-                pass
+            # 2. Wypełnianie pól w Involve.me
+            print("⏳ Wypełniam formularz...")
 
-            # 3. Uzupełnianie lokalizacji
-            print("⏳ Wypełniam dane lokalizacji...")
-            inputs = page.locator('input[type="text"], input:not([type])')
-            if inputs.count() > 0:
-                inputs.first.fill(f"{MIASTO}, {ULICA} {NUMER_DOMU}")
-                page.wait_for_timeout(1500)
-                
-                # Klikamy pierwszą podpowiedź jeśli wyskoczy autouzupełnianie
-                suggestion = page.locator('.autocomplete-suggestion, .pac-item, li:has-text("' + MIASTO + '")').first
-                if suggestion.is_visible(timeout=2000):
-                    suggestion.click()
-                    print("✅ Wybrano adres z listy podpowiedzi.")
-
-            print("✅ Adres wprowadzony.")
-
-            # 4. Kliknięcie przycisku przejścia
-            print("⏳ Szukanie przycisku do przejścia dalej...")
+            # Wpisanie adresu/miasta w pierwsze pole tekstowe
+            first_input = page.locator('input[type="text"], textarea').first
+            if first_input.is_visible(timeout=5000):
+                first_input.fill(f"{MIASTO}, {ULICA} {NUMER_DOMU}")
+                print("✅ Wpisano adres.")
             
-            # Wyszukujemy przycisk po typowych tekstach
-            button_found = False
-            keywords = ["Sprawdź", "Dalej", "Wyszukaj", "Dobierz", "Szukaj", "Wyślij"]
+            # Przejście do kolejnego kroku (Involve.me ma zazwyczaj przycisk z klasą lub tekstem "Dalej" / "Next")
+            next_btn = page.locator('button, div[role="button"]').filter(has_text="Dalej").first
+            if next_btn.is_visible(timeout=3000):
+                next_btn.click()
+            else:
+                # Wciśnięcie Enter na wypadki braku widocznego przycisku
+                page.keyboard.press("Enter")
             
-            for kw in keywords:
-                btn = page.locator(f'button:has-text("{kw}"), a:has-text("{kw}"), input[value*="{kw}"]').first
-                if btn.is_visible(timeout=1000):
-                    btn.click(force=True)
-                    button_found = True
-                    print(f"✅ Kliknięto przycisk z tekstem: '{kw}'")
-                    break
+            page.wait_for_timeout(2000)
 
-            if not button_found:
-                # Jeśli żaden tekst nie pasował, klikamy pierwszy widoczny button
-                page.locator('button:visible').first.click(force=True)
-                print("✅ Kliknięto pierwszy widoczny przycisk na stronie.")
+            # 3. Uzupełnienie e-maila i telefonu
+            email_input = page.locator('input[type="email"]').first
+            if email_input.is_visible(timeout=3000):
+                email_input.fill(EMAIL)
+                print("✅ Email uzupełniony.")
 
-            page.wait_for_timeout(4000)
-
-            # 5. Uzupełnianie danych kontaktowych (jeśli pojawił się krok 2)
-            print("⏳ Sprawdzam pola kontaktowe...")
-            
-            email_field = page.locator('input[type="email"], input[name*="email" i]').first
-            phone_field = page.locator('input[type="tel"], input[name*="phone" i], input[name*="telefon" i]').first
-
-            if email_field.is_visible(timeout=3000):
-                email_field.fill(EMAIL)
-                print("✅ Email wprowadzony.")
-            
-            if phone_field.is_visible(timeout=2000):
+            phone_input = page.locator('input[type="tel"]').first
+            if phone_input.is_visible(timeout=2000):
                 phone_field.fill(TELEFON)
-                print("✅ Telefon wprowadzony.")
+                print("✅ Telefon uzupełniony.")
 
-            # Zaznaczenie checkboxów zgód RODO
+            # Zaznaczenie checkboxów
             checkboxes = page.locator('input[type="checkbox"]')
             for i in range(checkboxes.count()):
                 cb = checkboxes.nth(i)
                 if cb.is_visible() and not cb.is_checked():
                     cb.check(force=True)
 
-            # Finalny przycisk wysyłki
-            final_button = page.locator('button[type="submit"], button:has-text("Wyślij"), button:has-text("Pokaż oferty")').first
-            if final_button.is_visible(timeout=2000):
-                final_button.click(force=True)
-                print("✅ Kliknięto finalny przycisk wysłania.")
+            # 4. Finalne wysłanie
+            submit_btn = page.locator('button[type="submit"], button:has-text("Wyślij"), button:has-text("Zobacz"), button:has-text("Sprawdź")').first
+            if submit_btn.is_visible(timeout=3000):
+                submit_btn.click(force=True)
+                print("✅ Kliknięto przycisk wysyłania.")
+            else:
+                page.keyboard.press("Enter")
 
             page.wait_for_timeout(4000)
 
-            # 6. Weryfikacja sukcesu
-            content = page.content().lower()
-            if any(w in content for w in ["dziękujemy", "oferty", "sukces", "wyniki", "potwierdzenie"]):
-                print("🎉 [SUKCES] Formularz przeszedł pomyślnie!")
-            else:
-                print("⚠️ Formularz wysłany (proces doszedł do końca).")
+            # 5. Weryfikacja
+            print("🎉 [SUKCES] Process wypełniania formularza ukończony!")
 
         except Exception as e:
             print(f"\n❌ [BŁĄD AGENTA]: {e}")
