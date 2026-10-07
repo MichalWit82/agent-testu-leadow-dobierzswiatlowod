@@ -25,18 +25,19 @@ jobs:
       - name: Uruchom agenta
         run: python agent.py
 
+     # --- E-MAIL W PRZYPADKU SUKCESU ---
       - name: Wyślij e-mail o sukcesie
         if: success()
         uses: dawidd6/action-send-mail@v3
         with:
-          server_address: ${{ secrets.MAIL_SERVER }}
+          server_address: smtp.gmail.com
           server_port: 465
           secure: true
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
           subject: "✅ [RAPORT] Landing Page dobierzswiatlowod.netradar.pl działa prawidłowo!"
           to: michal@e-pasaz.eu
-          from: Agent Testowy <${{ secrets.MAIL_USERNAME }}>
+          from: Agent Testowy <michal@e-pasaz.eu>
           body: |
             Cześć Michał,
 
