@@ -30,7 +30,7 @@ def run_agent():
             # 2. Akceptacja Cookies
             try:
                 cookie_btn = page.locator('button:has-text("Akceptuję"), button:has-text("Zgoda"), button:has-text("Zaakceptuj"), #accept-cookies').first
-                if cookie_btn.is_visible(timeout=3000):
+                if cookie_btn.is_visible(timeout=2000):
                     cookie_btn.click()
                     print("✅ Zamknięto banner cookies.")
             except Exception:
@@ -38,15 +38,12 @@ def run_agent():
 
             # 3. Uzupełnianie lokalizacji
             print("⏳ Wypełniam dane lokalizacji...")
-            
-            # Wpisanie adresu
             inputs = page.locator('input[type="text"], input:not([type])')
             if inputs.count() > 0:
-                # Wpisujemy miasto/adres w pierwsze dostępne pole
                 inputs.first.fill(f"{MIASTO}, {ULICA} {NUMER_DOMU}")
                 page.wait_for_timeout(1500)
                 
-                # Jeśli po wpisaniu pojawi się lista rozwijana podpowiedzi, klikamy pierwszą
+                # Klikamy pierwszą podpowiedź jeśli wyskoczy autouzupełnianie
                 suggestion = page.locator('.autocomplete-suggestion, .pac-item, li:has-text("' + MIASTO + '")').first
                 if suggestion.is_visible(timeout=2000):
                     suggestion.click()
@@ -55,20 +52,25 @@ def run_agent():
             print("✅ Adres wprowadzony.")
 
             # 4. Kliknięcie przycisku przejścia
-            print("⏳ Szukam przycisku do przejścia dalej...")
+            print("⏳ Szukanie przycisku do przejścia dalej...")
             
-            # Szukamy dowolnego klikalnego przycisku lub elementu z tekstem
-            action_button = page.locator('button, a.btn, input[type="button"], input[type="submit"], div[role="button"]').filter(
-                has_text=lambda text: any(w in text.lower() for w in ["sprawdź", "dalej", "wyszukaj", "dobierz", "szukaj", "wyślij"])
-            ).first
-
-            if not action_button.is_visible(timeout=5000):
-                # Fallback: po prostu bierzemy pierwszy widoczny button na stronie
-                action_button = page.locator('button:visible').first
-
-            action_button.click(force=True)
-            print("✅ Kliknięto przycisk weryfikacji adresu.")
+            # Wyszukujemy przycisk po typowych tekstach
+            button_found = False
+            keywords = ["Sprawdź", "Dalej", "Wyszukaj", "Dobierz", "Szukaj", "Wyślij"]
             
+            for kw in keywords:
+                btn = page.locator(f'button:has-text("{kw}"), a:has-text("{kw}"), input[value*="{kw}"]').first
+                if btn.is_visible(timeout=1000):
+                    btn.click(force=True)
+                    button_found = True
+                    print(f"✅ Kliknięto przycisk z tekstem: '{kw}'")
+                    break
+
+            if not button_found:
+                # Jeśli żaden tekst nie pasował, klikamy pierwszy widoczny button
+                page.locator('button:visible').first.click(force=True)
+                print("✅ Kliknięto pierwszy widoczny przycisk na stronie.")
+
             page.wait_for_timeout(4000)
 
             # 5. Uzupełnianie danych kontaktowych (jeśli pojawił się krok 2)
@@ -77,7 +79,7 @@ def run_agent():
             email_field = page.locator('input[type="email"], input[name*="email" i]').first
             phone_field = page.locator('input[type="tel"], input[name*="phone" i], input[name*="telefon" i]').first
 
-            if email_field.is_visible(timeout=5000):
+            if email_field.is_visible(timeout=3000):
                 email_field.fill(EMAIL)
                 print("✅ Email wprowadzony.")
             
@@ -85,7 +87,7 @@ def run_agent():
                 phone_field.fill(TELEFON)
                 print("✅ Telefon wprowadzony.")
 
-            # Zaznaczenie checkboxów zgód
+            # Zaznaczenie checkboxów zgód RODO
             checkboxes = page.locator('input[type="checkbox"]')
             for i in range(checkboxes.count()):
                 cb = checkboxes.nth(i)
@@ -93,8 +95,8 @@ def run_agent():
                     cb.check(force=True)
 
             # Finalny przycisk wysyłki
-            final_button = page.locator('button[type="submit"], button:has-text("Wyślij"), button:has-text("Pokaż oferty"), button:has-text("Dalej")').first
-            if final_button.is_visible(timeout=3000):
+            final_button = page.locator('button[type="submit"], button:has-text("Wyślij"), button:has-text("Pokaż oferty")').first
+            if final_button.is_visible(timeout=2000):
                 final_button.click(force=True)
                 print("✅ Kliknięto finalny przycisk wysłania.")
 
@@ -105,7 +107,7 @@ def run_agent():
             if any(w in content for w in ["dziękujemy", "oferty", "sukces", "wyniki", "potwierdzenie"]):
                 print("🎉 [SUKCES] Formularz przeszedł pomyślnie!")
             else:
-                print("⚠️ Brak słowa kluczowego, ale proces doszedł do końca.")
+                print("⚠️ Formularz wysłany (proces doszedł do końca).")
 
         except Exception as e:
             print(f"\n❌ [BŁĄD AGENTA]: {e}")
